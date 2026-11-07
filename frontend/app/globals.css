@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.75rem;
+  }
+
+  html[dir='rtl'] {
+    text-align: right;
+  }
+
+  body {
+    @apply antialiased;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white focus:ring-brand-500 hover:bg-brand-700;
+  }
+  .btn-success {
+    @apply btn bg-green-600 text-white focus:ring-green-500 hover:bg-green-700;
+  }
+  .btn-danger {
+    @apply btn bg-red-600 text-white focus:ring-red-500 hover:bg-red-700;
+  }
+  .btn-ghost {
+    @apply btn bg-gray-200 text-gray-900 focus:ring-gray-400 hover:bg-gray-300;
+  }
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-4;
+  }
+  .input {
+    @apply block w-full rounded-xl border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors;
+  }
+  .label {
+    @apply block text-sm font-medium text-gray-700 mb-1.5;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

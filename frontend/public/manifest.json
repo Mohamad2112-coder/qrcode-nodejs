@@ -1,0 +1,33 @@
+{
+  "name": "QR Order Pager - Customer Tracker",
+  "short_name": "QR Tracker",
+  "description": "Track your QR order status in real time",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#0ea5e9",
+  "id": "/",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["food", "drink", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Track Order",
+      "url": "/track",
+      "description": "Open order tracker",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

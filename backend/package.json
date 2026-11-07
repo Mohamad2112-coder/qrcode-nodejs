@@ -1,0 +1,29 @@
+{
+  "name": "qr-order-api",
+  "version": "1.0.0",
+  "description": "QR-based customer order notification & mobile pager SaaS backend",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node --input-type=module -e \"import('./database/seed.js').then(()=>process.exit(0)).catch(e=>{console.error(e);process.exit(1)})\""
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "express-async-handler": "^1.2.0",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.9.6",
+    "socket.io": "^4.7.5",
+    "uuid": "^9.0.1",
+    "web-push": "^3.6.7",
+    "zod": "^3.22.4"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
