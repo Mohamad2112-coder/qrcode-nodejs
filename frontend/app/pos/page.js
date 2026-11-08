@@ -1,9 +1,9 @@
 /**
- * Cashier POS Interface
- * - High-speed product grid (categories filterable)
- * - Reactive cart with quantity/notes adjustments
- * - Real-time total calculation
- * - Order submission & QR token generator modal
+ * Cashier Dashboard / POS Interface
+ * - Sales summary cards (today's revenue, order count, pending/ready)
+ * - Order queue with status transitions (Mark Ready / Mark Collected)
+ * - Product grid + cart for taking new orders
+ * - QR token generation for customer tracking
  */
 'use client';
 
@@ -20,15 +20,23 @@ const CATEGORIES = [
 ];
 
 const MENU = [
-  { id: 'p1', category: 'food', name: { en: 'Grilled Burger', ar: 'برجر مشوي', kb: 'بۆर्गەر کۆتایی' }, price: 8.50, available: true },
-  { id: 'p2', category: 'food', name: { en: 'Margherita Pizza', ar: 'بيتزا مارgherita', kb: 'پیتزای مارgherita' }, price: 12.00, available: true },
-  { id: 'p3', category: 'food', name: { en: 'Caesar Salad', ar: 'سلطة سيزر', kb: 'سالاتی سێزەر' }, price: 6.50, available: true },
-  { id: 'p4', category: 'drink', name: { en: 'Cola', ar: 'كوكاكولا', kb: 'کۆلا' }, price: 2.00, available: true },
-  { id: 'p5', category: 'drink', name: { en: 'Fresh Orange Juice', ar: 'عصير برتقال طازج', kb: 'ئۆرێنج تازە' }, price: 4.00, available: true },
-  { id: 'p6', category: 'drink', name: { en: 'Bottled Water', ar: 'ماء معبأ', kb: 'ئاو پڕکراو' }, price: 1.50, available: true },
-  { id: 'p7', category: 'dessert', name: { en: 'Cheesecake', ar: 'كعكة الجبن', kb: 'چیزکیک' }, price: 5.50, available: true },
-  { id: 'p8', category: 'dessert', name: { en: 'Ice Cream', ar: 'آيس كريم', kb: 'ئایسکریم' }, price: 3.00, available: true },
+  { id: 'p1', category: 'food', name: { en: 'Grilled Burger', ar: 'برجر مشوي', kb: 'بۆرجەر کۆتایی' }, price: 8500, available: true },
+  { id: 'p2', category: 'food', name: { en: 'Margherita Pizza', ar: 'بيتزا مارgherita', kb: 'پیتزای مارgherita' }, price: 12000, available: true },
+  { id: 'p3', category: 'food', name: { en: 'Caesar Salad', ar: 'سلطة سيزر', kb: 'سالاتی سێزەر' }, price: 6500, available: true },
+  { id: 'p4', category: 'drink', name: { en: 'Cola', ar: 'كوكاكولا', kb: 'کۆلا' }, price: 2000, available: true },
+  { id: 'p5', category: 'drink', name: { en: 'Fresh Orange Juice', ar: 'عصير برتقال طازج', kb: 'ئۆرێنج تازە' }, price: 4000, available: true },
+  { id: 'p6', category: 'drink', name: { en: 'Bottled Water', ar: 'ماء معبأ', kb: 'ئاو پڕکراو' }, price: 1500, available: true },
+  { id: 'p7', category: 'dessert', name: { en: 'Cheesecake', ar: 'كعكة الجبن', kb: 'چیزکیک' }, price: 5500, available: true },
+  { id: 'p8', category: 'dessert', name: { en: 'Ice Cream', ar: 'آيس كريم', kb: 'ئایسکریم' }, price: 3000, available: true },
 ];
+
+const STATUS_COLORS = {
+  PENDING: 'bg-amber-100 text-amber-800 border-amber-200',
+  PREPARING: 'bg-blue-100 text-blue-800 border-blue-200',
+  READY: 'bg-green-100 text-green-800 border-green-200',
+  COLLECTED: 'bg-gray-100 text-gray-600 border-gray-200',
+  CANCELLED: 'bg-red-100 text-red-800 border-red-200',
+};
 
 function localized(obj, locale) {
   return obj && obj[locale] ? obj[locale] : (obj.en || obj);
@@ -39,6 +47,7 @@ export default function PosPage() {
   const locale = typeof window !== 'undefined' ? localStorage.getItem('qr_locale') || 'en' : 'en';
   const dir = direction(locale);
 
+  // --- Cart state ---
   const [products, setProducts] = useState(MENU);
   const [activeCategory, setActiveCategory] = useState('all');
   const [cart, setCart] = useState([]);
@@ -49,15 +58,20 @@ export default function PosPage() {
   const [submitting, setSubmitting] = useState(false);
   const [qrModal, setQrModal] = useState(false);
   const [qrData, setQrData] = useState(null);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState(null);
   const [error, setError] = useState(null);
 
-  // Load products from API on mount (fallback to static MENU)
+  // --- Order queue state ---
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [transitioning, setTransitioning] = useState({});
+
+  // --- Load products from API on mount (fallback to static MENU) ---
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         // POS doesn't require backend products to function; static MENU is the fallback.
-        // In production, fetch from /api/v1/products here.
       } catch (_e) {
         // ignore
       }
@@ -65,12 +79,60 @@ export default function PosPage() {
     return () => { mounted = false; };
   }, []);
 
+  // --- Fetch today's orders for the queue ---
+  const fetchOrders = useCallback(async () => {
+    setOrdersLoading(true);
+    try {
+      const { orders: fetched } = await orderApi.list({ limit: 100 });
+      setOrders(fetched || []);
+    } catch (_e) {
+      // ignore - queue will be empty
+    } finally {
+      setOrdersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 10000); // refresh every 10s
+    return () => clearInterval(interval);
+  }, [fetchOrders]);
+
+  // --- Transition order status ---
+  const transitionOrder = async (orderId, status) => {
+    setTransitioning((prev) => ({ ...prev, [orderId]: true }));
+    try {
+      await orderApi.transition(orderId, status);
+      await fetchOrders();
+    } catch (err) {
+      setError(err.message || t('error'));
+    } finally {
+      setTransitioning((prev) => {
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
+      });
+    }
+  };
+
+  const isPending = (s) => s === 'PENDING';
+  const isReady = (s) => s === 'READY';
+
+  // --- Cart computations ---
   const filteredProducts = activeCategory === 'all'
     ? products
     : products.filter((p) => p.category === activeCategory && p.available);
 
   const cartTotal = cart.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  // --- Sales summary from orders ---
+  // Show all orders for the business (not just today) so no order is missed
+  const allOrders = orders;
+  const totalSales = allOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+  const pendingCount = allOrders.filter((o) => o.status === 'PENDING').length;
+  const readyCount = allOrders.filter((o) => o.status === 'READY').length;
+  const collectedCount = allOrders.filter((o) => o.status === 'COLLECTED').length;
 
   const addToCart = useCallback((product) => {
     setCart((prev) => {
@@ -80,7 +142,7 @@ export default function PosPage() {
           i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i,
         );
       }
-      return [...prev, { ...product, quantity: 1 }];
+      return [...prev, { ...product, quantity: 1, unitPrice: product.price }];
     });
   }, []);
 
@@ -127,19 +189,36 @@ export default function PosPage() {
         })),
       };
       const result = await orderApi.create(payload);
+      const trackingUrl = result.trackingUrl;
+
+      // Generate QR code image URL (no canvas needed)
+      const qrDataUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(trackingUrl)}`;
+
       setQrData({
         orderId: result.orderId,
         orderNumber: result.orderNumber,
         qrToken: result.qrToken,
         trackingUrl: result.trackingUrl,
         totalAmount: result.totalAmount,
+        customerName: customerName || 'Walk-in Customer',
+        customerPhone: customerPhone || '',
+        tableNumber: tableNumber || '',
+        // Save cart items before clearing for print receipt
+        items: cart.map((item) => ({
+          name: localized(item.name, locale),
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.quantity * item.unitPrice,
+        })),
       });
+      setQrCodeDataUrl(qrDataUrl);
       setQrModal(true);
       clearCart();
       setCustomerName('');
       setCustomerPhone('');
       setTableNumber('');
       setOrderNotes('');
+      await fetchOrders();
     } catch (err) {
       setError(err.message || t('error'));
     } finally {
@@ -147,8 +226,90 @@ export default function PosPage() {
     }
   };
 
+  const STATUS_LABELS = {
+    PENDING: t('statusPending') || 'Pending',
+    PREPARING: t('statusPreparing') || 'Preparing',
+    READY: t('statusReady') || 'Ready',
+    COLLECTED: t('statusCollected') || 'Collected',
+    CANCELLED: t('statusCancelled') || 'Cancelled',
+  };
+
+  const printOrder = () => {
+    const printItems = qrData?.items || [];
+    const printWindow = window.open('', '_blank');
+    const itemsHtml = printItems
+      .map(
+        (item) => `
+      <tr>
+        <td>${item.name}</td>
+        <td style="text-align:center">${item.quantity}</td>
+        <td>${formatCurrency(item.unitPrice, locale)}</td>
+        <td>${formatCurrency(item.totalPrice, locale)}</td>
+      </tr>
+    `,
+      )
+      .join('');
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Order Receipt - ${qrData.orderNumber}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .qr-code { margin: 10px 0; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .total { font-size: 18px; font-weight: bold; text-align: right; }
+            .footer { margin-top: 30px; font-size: 12px; color: #666; text-align: center; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body onload="window.print(); window.close();">
+          <div class="header">
+            <h1>QR Order Pager</h1>
+            <p>Order #${qrData.orderNumber}</p>
+            <p>Customer: ${qrData.customerName}</p>
+            <p>Table: ${qrData.tableNumber || '—'}</p>
+            <p>Phone: ${qrData.customerPhone || '—'}</p>
+          </div>
+
+          <div class="qr-code">
+            <img src="${qrCodeDataUrl}" alt="QR Code" width="200" height="200" />
+            <p><strong>Customer scans this QR to track order status</strong></p>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Unit Price</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+
+          <div class="total">
+            Total: ${formatCurrency(qrData.totalAmount, locale)}
+          </div>
+
+          <div class="footer">
+            Thank you for your order! Scan the QR code above to track your order status.
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6" dir={dir}>
       {/* Header */}
       <div className="max-w-7xl mx-auto mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -163,6 +324,106 @@ export default function PosPage() {
         </div>
       </div>
 
+      {/* Sales Summary Cards */}
+      <div className="max-w-7xl mx-auto mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="card p-6 bg-white border-l-4 border-brand-600 shadow-sm">
+          <div className="text-gray-500 text-xs font-semibold uppercase mb-1">Total Sales</div>
+          <div className="text-2xl font-bold text-gray-900">{formatCurrency(totalSales, locale)}</div>
+        </div>
+        <div className="card p-6 bg-white border-l-4 border-blue-600 shadow-sm">
+          <div className="text-gray-500 text-xs font-semibold uppercase mb-1">All Orders</div>
+          <div className="text-2xl font-bold text-gray-900">{allOrders.length}</div>
+        </div>
+        <div className="card p-6 bg-white border-l-4 border-amber-600 shadow-sm">
+          <div className="text-gray-500 text-xs font-semibold uppercase mb-1">Pending</div>
+          <div className="text-2xl font-bold text-gray-900">{pendingCount}</div>
+        </div>
+        <div className="card p-6 bg-white border-l-4 border-green-600 shadow-sm">
+          <div className="text-gray-500 text-xs font-semibold uppercase mb-1">Ready / Collected</div>
+          <div className="text-2xl font-bold text-gray-900">{readyCount + collectedCount}</div>
+        </div>
+      </div>
+
+      {/* Order Queue Section */}
+      <div className="max-w-7xl mx-auto mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-gray-900">{t('orders') || 'Order Queue'}</h2>
+          {ordersLoading && (
+            <span className="text-xs text-brand-600 animate-pulse">Updating…</span>
+          )}
+        </div>
+
+        {allOrders.length === 0 ? (
+          <div className="card p-12 text-center text-gray-500 border border-dashed border-gray-200">
+            <div className="text-4xl mb-2">📋</div>
+            <p>No orders yet. Start by adding items to the cart below.</p>
+          </div>
+        ) : (
+          <div className="card overflow-hidden">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Order #</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Customer</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Total</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allOrders.map((order) => {
+                  const isTransitioning = transitioning[order.id];
+                  return (
+                    <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 font-mono text-sm font-bold text-gray-900">
+                        {order.order_number}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {order.customer_name || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        {formatCurrency(order.total_amount || 0, locale)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded text-xs font-medium border ${STATUS_COLORS[order.status]}`}>
+                          {STATUS_LABELS[order.status] || order.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2">
+                          {isPending(order.status) && !isTransitioning && (
+                            <button
+                              onClick={() => transitionOrder(order.id, 'READY')}
+                              disabled={isTransitioning}
+                              className="px-3 py-1.5 text-xs font-medium bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                            >
+                              {t('markReady') || 'Mark Ready'}
+                            </button>
+                          )}
+                          {isReady(order.status) && !isTransitioning && (
+                            <button
+                              onClick={() => transitionOrder(order.id, 'COLLECTED')}
+                              disabled={isTransitioning}
+                              className="px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition-colors"
+                            >
+                              {t('markCollected') || 'Mark Collected'}
+                            </button>
+                          )}
+                          {isTransitioning && (
+                            <span className="px-3 py-1.5 text-xs text-gray-400 animate-pulse">…</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* POS Order Taking Section */}
       <div className="max-w-7xl mx-auto grid grid-cols-12 gap-6">
         {/* Left: Menu Grid (8 cols) */}
         <div className="md:col-span-8 space-y-4">
@@ -241,31 +502,62 @@ export default function PosPage() {
             ) : (
               <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
                 {cart.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between gap-3 p-2 rounded-lg bg-gray-50 border border-gray-100">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-semibold text-gray-900 truncate">{localized(item.name, locale)}</h4>
-                        <span className="text-xs text-gray-500">{item.quantity}x</span>
+                  <div key={item.id} className="flex flex-col gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    {/* Top row: item name, qty, price breakdown */}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="text-sm font-semibold text-gray-900 truncate">
+                            {localized(item.name, locale)}
+                          </h4>
+                          <span className="text-xs text-gray-500">{item.quantity}x</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-gray-700">{formatCurrency(item.unitPrice, locale)}</span>
+                          <span className="text-xs text-gray-400">×</span>
+                          <span className="text-xs text-gray-400">{item.quantity}</span>
+                          <span className="text-xs text-gray-400">=</span>
+                          <span className="font-medium text-gray-900">
+                            {formatCurrency(item.quantity * item.unitPrice, locale)}
+                          </span>
+                        </div>
+                        {item.notes && (
+                          <p className="text-xs text-gray-500 mt-1 italic">Note: {item.notes}</p>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-sm text-gray-700">{formatCurrency(item.unitPrice, locale)}</span>
-                        <span className="text-xs text-gray-400">=</span>
-                        <span className="text-sm font-medium text-gray-900">{formatCurrency(item.quantity * item.unitPrice, locale)}</span>
+
+                      {/* Quantity controls */}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => adjustQty(item.id, -1)}
+                          className="w-8 h-8 rounded-lg bg-white border border-gray-300 text-gray-700 text-xs font-bold flex items-center justify-center hover:bg-gray-100 transition-colors disabled:opacity-50"
+                        >
+                          −
+                        </button>
+                        <span className="w-8 text-center text-sm font-medium text-gray-900">
+                          {item.quantity}
+                        </span>
+                        <button
+                          onClick={() => adjustQty(item.id, 1)}
+                          className="w-8 h-8 rounded-lg bg-white border border-gray-300 text-gray-700 text-xs font-bold flex items-center justify-center hover:bg-gray-100 transition-colors"
+                        >
+                          +
+                        </button>
+                        <button
+                          onClick={() => removeItem(item.id)}
+                          className="w-8 h-8 rounded-lg text-red-500 hover:bg-red-50 flex items-center justify-center text-xs"
+                        >
+                          ×
+                        </button>
                       </div>
-                      {item.notes && (
-                        <p className="text-xs text-gray-500 mt-1 italic">Note: {item.notes}</p>
-                      )}
                     </div>
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => adjustQty(item.id, -1)} className="w-7 h-7 rounded-lg bg-white border border-gray-300 text-gray-700 text-xs font-bold flex items-center justify-center hover:bg-gray-100 transition-colors">−</button>
-                      <button onClick={() => adjustQty(item.id, 1)} className="w-7 h-7 rounded-lg bg-white border border-gray-300 text-gray-700 text-xs font-bold flex items-center justify-center hover:bg-gray-100 transition-colors">+</button>
-                      <button onClick={() => removeItem(item.id)} className="w-7 h-7 rounded-lg text-red-500 hover:bg-red-50 flex items-center justify-center text-xs">×</button>
-                    </div>
-                    <div className="ml-3">
+
+                    {/* Notes input */}
+                    <div className="flex items-center gap-2">
                       <label className="label text-xs">{t('notes')}</label>
                       <input
                         type="text"
-                        className="input text-xs"
+                        className="flex-1 input text-xs"
                         value={item.notes || ''}
                         onChange={(e) => updateItemNotes(item.id, e.target.value)}
                         placeholder={t('notes')}
@@ -350,18 +642,50 @@ export default function PosPage() {
               </div>
               <h3 className="text-xl font-bold text-gray-900">{t('orderCreated')}</h3>
               <p className="text-gray-600 text-sm mt-1">Order #{qrData.orderNumber}</p>
+              <p className="text-gray-600 text-sm mt-0.5">{t('customer')}: {qrData.customerName}</p>
             </div>
 
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="label">{t('qrToken')}</label>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 truncate">
-                    {qrData.qrToken}
-                  </span>
+            {/* Order Items List */}
+            {qrData.items && qrData.items.length > 0 && (
+              <div className="space-y-2 mb-6">
+                <label className="label">{t('items')}</label>
+                <div className="max-h-40 overflow-y-auto border border-gray-100 rounded-lg">
+                  {qrData.items.map((item) => (
+                    <div key={item.name} className="flex items-center justify-between px-3 py-2 border-b border-gray-50 last:border-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500">{item.quantity}x</span>
+                        <span className="text-sm text-gray-900 truncate">{item.name}</span>
+                      </div>
+                      <span className="text-sm font-medium text-gray-900">
+                        {formatCurrency(item.totalPrice, locale)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-                <p className="text-xs text-gray-500 mt-1">{t('scanToTrack')}</p>
               </div>
+            )}
+
+            <div className="space-y-4 mb-6">
+              {qrCodeDataUrl ? (
+                <div className="flex flex-col items-center">
+                  <img
+                    src={qrCodeDataUrl}
+                    alt="QR Code"
+                    className="w-40 h-40 rounded-lg bg-white p-2 border border-gray-200 shadow-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-2">{t('scanQrToTrack') || 'Scan to track your order'}</p>
+                </div>
+              ) : (
+                <div>
+                  <label className="label">{t('qrToken')}</label>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 truncate">
+                      {qrData.qrToken}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">{t('scanToTrack')}</p>
+                </div>
+              )}
               <div>
                 <label className="label">{t('total')}</label>
                 <span className="text-lg font-bold">{formatCurrency(qrData.totalAmount, locale)}</span>
@@ -370,13 +694,19 @@ export default function PosPage() {
 
             <div className="flex gap-2">
               <button
+                onClick={printOrder}
+                className="btn btn-ghost flex-1 text-sm"
+              >
+                🖨️ {t('printOrder') || 'Print Order'}
+              </button>
+              <button
                 onClick={() => {
-                  navigator.clipboard.writeText(qrData.qrToken).catch(() => {});
+                  navigator.clipboard.writeText(qrData.trackingUrl).catch(() => {});
                   setQrModal(false);
                 }}
                 className="btn btn-ghost flex-1 text-sm"
               >
-                Copy Token
+                {qrCodeDataUrl ? t('copyUrl') || 'Copy Tracking URL' : t('copyToken') || 'Copy Token'}
               </button>
               <button
                 onClick={() => setQrModal(false)}

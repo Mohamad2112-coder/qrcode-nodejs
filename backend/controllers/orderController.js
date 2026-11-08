@@ -27,6 +27,7 @@ export const ALLOWED_TRANSITIONS = {
 // transitionKey => roles allowed to perform it
 export const TRANSITION_ROLES = {
   'PENDING->PREPARING': ['kitchen', 'cashier', 'manager', 'owner'],
+  'PENDING->READY': ['cashier', 'manager', 'owner'],
   'PENDING->CANCELLED': ['cashier', 'manager', 'owner'],
   'PREPARING->READY': ['kitchen', 'manager', 'owner'],
   'PREPARING->CANCELLED': ['manager', 'owner'],

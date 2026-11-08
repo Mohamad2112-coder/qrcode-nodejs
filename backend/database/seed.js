@@ -20,7 +20,7 @@ async function ensureBusiness() {
   if (rows.length > 0) return rows[0].id;
   const id = uuidv4();
   await query(
-    `INSERT INTO businesses (id, name, slug, timezone, currency) VALUES (?, ?, ?, 'UTC', 'USD')`,
+    `INSERT INTO businesses (id, name, slug, timezone, currency) VALUES (?, ?, ?, 'UTC', 'IQD')`,
     [id, BUSINESS_NAME, BUSINESS_SLUG],
   );
   console.log(`[SEED] Created business: ${BUSINESS_NAME} (${id})`);
@@ -86,14 +86,14 @@ async function ensureDemoKitchenUser(businessId) {
 
 async function ensureProducts(businessId) {
   const MENU_ITEMS = [
-    { id: 'p1', name: 'Grilled Burger', price: 8.50 },
-    { id: 'p2', name: 'Margherita Pizza', price: 12.00 },
-    { id: 'p3', name: 'Caesar Salad', price: 6.50 },
-    { id: 'p4', name: 'Cola', price: 2.00 },
-    { id: 'p5', name: 'Fresh Orange Juice', price: 4.00 },
-    { id: 'p6', name: 'Bottled Water', price: 1.50 },
-    { id: 'p7', name: 'Cheesecake', price: 5.50 },
-    { id: 'p8', name: 'Ice Cream', price: 3.00 },
+    { id: 'p1', name: 'Grilled Burger', price: 8500 },
+    { id: 'p2', name: 'Margherita Pizza', price: 12000 },
+    { id: 'p3', name: 'Caesar Salad', price: 6500 },
+    { id: 'p4', name: 'Cola', price: 2000 },
+    { id: 'p5', name: 'Fresh Orange Juice', price: 4000 },
+    { id: 'p6', name: 'Bottled Water', price: 1500 },
+    { id: 'p7', name: 'Cheesecake', price: 5500 },
+    { id: 'p8', name: 'Ice Cream', price: 3000 },
   ];
   for (const item of MENU_ITEMS) {
     const [rows] = await query('SELECT id FROM products WHERE id = ? LIMIT 1', [item.id]);
