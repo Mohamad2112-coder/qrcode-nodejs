@@ -317,21 +317,26 @@ export default function TrackPage() {
         </div>
 
         {/* Web Push opt-in banner */}
-        {pushSupported && !pushSubscribed && !isComplete && (
-          <div className="card border-2 border-brand-200 bg-brand-50 p-4 rounded-xl">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-white text-xs">📢</div>
+        {!pushSubscribed && !isComplete && (
+          <div className="card border-4 border-brand-600 bg-brand-50 p-6 rounded-2xl shadow-lg animate-pulse">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-brand-600 flex items-center justify-center text-white text-2xl">📢</div>
               <div>
-                <p className="font-semibold text-gray-900">{t('enableNotifications')}</p>
-                <p className="text-sm text-gray-600 mt-0.5">
+                <p className="text-lg font-bold text-gray-900">{t('enableNotifications')}</p>
+                <p className="text-base text-gray-700 mt-1">
                   {t('notifyReady') || 'Get notified when your order is ready.'}
                 </p>
+                {pushSupported === false && (
+                  <p className="text-sm text-gray-600 mt-2">
+                    {t('pushNotSupported') || 'Add this page to your Home Screen first, then tap Notify Me.'}
+                  </p>
+                )}
               </div>
             </div>
             <button
               onClick={registerPush}
-              disabled={registering}
-              className="mt-4 w-full btn btn-primary py-2.5 text-sm disabled:opacity-50"
+              disabled={registering || !pushSupported}
+              className="mt-6 w-full btn btn-primary py-4 text-lg font-bold disabled:opacity-50"
             >
               {registering ? 'Activating...' : t('notifyReady') || 'Notify Me When Ready'}
             </button>

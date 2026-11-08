@@ -33,6 +33,7 @@ const MESSAGES = {
     copyToken: 'Copy Token',
     copyUrl: 'Copy Tracking URL',
     printOrder: 'Print Order',
+    pushNotSupported: 'Add this page to your Home Screen first, then tap Notify Me.',
     statusPending: 'Pending',
     statusPreparing: 'Preparing',
     statusReady: 'Ready',
@@ -91,6 +92,7 @@ const MESSAGES = {
     copyToken: 'نسخ الرمز',
     copyUrl: 'نسخ رابط التتبع',
     printOrder: 'طباعة الطلب',
+    pushNotSupported: 'أضف هذه الصفحة إلى شاشتك الرئيسية أولاً، ثم انقر على إعلامي.',
     statusPending: 'قيد الانتظار',
     statusPreparing: 'قيد التحضير',
     statusReady: 'جاهز',
@@ -174,6 +176,7 @@ const MESSAGES = {
     copyToken: 'نوسینەوەی تووڵ',
     copyUrl: 'نوسینەوەی بەستەری تەقەلاکردنەوە',
     printOrder: 'چاپکردنەوەی فانل',
+    pushNotSupported: 'پەڕەکە بۆ شاشەکەت הביתه بۆ بۆ بۆ دەسیllen بکە پێشه‌وه‌ دەستیllen بکە بۆ تەقەلاکردنەوە.',
   },
 };
 
