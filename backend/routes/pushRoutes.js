@@ -1,13 +1,13 @@
 /**
  * Web Push routes
  *
- * POST   /subscribe        - Store a push subscription (tenant-scoped)
- * DELETE /subscribe        - Deactivate a push subscription
- * GET    /vapid-public-key - (handled in server.js)
- * POST   /notify/ready     - Trigger READY notification for an order (kitchen/cashier)
- * POST   /process-jobs     - Process pending notification jobs (admin)
+ * POST   /subscribe        - Store a push subscription (public - from customer tracker)
+ * DELETE /subscribe        - Deactivate a push subscription (requires auth)
+ * POST   /notify/ready     - Trigger READY notification for an order (requires auth)
+ * POST   /process-jobs     - Process pending notification jobs (requires auth)
  */
 import { Router } from 'express';
+import { query } from '../config/db.js';
 import { tenantScope } from '../middleware/tenantScope.js';
 import { authenticate, authorize, authorizeRoles } from '../middleware/auth.js';
 import {
@@ -19,20 +19,46 @@ import {
 
 const router = Router();
 
-router.use(tenantScope);
-router.use(authenticate);
-
 /**
- * Store a push subscription from the customer tracker PWA.
+ * Public: Customer subscribes to push notifications from the tracking page.
+ * No authentication required - the order_id in the body links the subscription
+ * to a specific order/business.
  * Body: { endpoint, p256h_key, auth_key, user_agent?, order_id? }
  */
 router.post(
   '/subscribe',
-  authorize('push:write'),
   async (req, res, next) => {
     try {
-      const { business_id } = req.user;
       const { endpoint, p256h_key, auth_key, user_agent, order_id } = req.body;
+
+      if (!endpoint || !p256h_key || !auth_key) {
+        return res.status(400).json({
+          error: 'Bad request',
+          message: 'Missing required push subscription fields',
+          code: 'MISSING_FIELDS',
+        });
+      }
+
+      // Look up business_id from the order if order_id is provided
+      let business_id = null;
+      if (order_id) {
+        const [rows] = await query(
+          'SELECT business_id FROM orders WHERE id = ? LIMIT 1',
+          [order_id],
+        );
+        if (rows.length > 0) {
+          business_id = rows[0].business_id;
+        }
+      }
+
+      if (!business_id) {
+        return res.status(400).json({
+          error: 'Bad request',
+          message: 'Cannot determine business from order',
+          code: 'NO_BUSINESS_CONTEXT',
+        });
+      }
+
       const result = await storeSubscription({
         business_id,
         order_id: order_id || null,
@@ -49,20 +75,24 @@ router.post(
 );
 
 /**
- * Deactivate a push subscription.
+ * Protected routes (require authentication)
+ */
+router.use(tenantScope);
+router.use(authenticate);
+
+/**
+ * Deactivate a subscription.
  * Body: { endpoint }
  */
 router.delete(
   '/subscribe',
-  authorize('push:write'),
   async (req, res, next) => {
     try {
-      const { business_id } = req.user;
       const { endpoint } = req.body;
       if (!endpoint) {
         return res.status(400).json({ error: 'endpoint is required' });
       }
-      await removeSubscription(business_id, endpoint);
+      await removeSubscription(req.user.business_id, endpoint);
       return res.json({ success: true });
     } catch (err) {
       next(err);
@@ -76,7 +106,6 @@ router.delete(
  */
 router.post(
   '/notify/ready',
-  authorize('push:write'),
   authorizeRoles('kitchen', 'cashier', 'manager', 'owner', 'super_admin'),
   async (req, res, next) => {
     try {

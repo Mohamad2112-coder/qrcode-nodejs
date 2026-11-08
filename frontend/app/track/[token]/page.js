@@ -154,10 +154,8 @@ export default function TrackPage() {
 
       setPushSubscribed(true);
       setPushPrompt(false);
-      // Notify backend this order wants READY notifications
-      if (order?.id) {
-        await api.post('/api/v1/push/notify/ready', { orderId: order.id });
-      }
+      // Note: order_id is stored with the subscription so the backend
+      // knows which order's READY notifications to send to this subscriber.
     } catch (err) {
       console.error('[PUSH] registration failed', err);
       setError(err.message || 'Push registration failed');
