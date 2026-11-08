@@ -45,13 +45,12 @@ export default function TrackPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [pushSupported, setPushSupported] = useState(false);
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [pushPrompt, setPushPrompt] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [previousStatus, setPreviousStatus] = useState(null);
   const [statusChanged, setStatusChanged] = useState(false);
-
+  const pushSupported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
   const steps = STATUS_STEPS[locale] || STATUS_STEPS.en;
 
   const trackStatusLabels = {
@@ -110,10 +109,7 @@ export default function TrackPage() {
       }
     }, 5000);
 
-    // Check push support
-    if (typeof window !== 'undefined') {
-      setPushSupported('serviceWorker' in navigator && 'PushManager' in window);
-    }
+    // Check push support is done via direct check above
 
     return () => {
       mounted = false;
