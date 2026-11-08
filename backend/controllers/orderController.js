@@ -9,7 +9,7 @@ import asyncHandler from 'express-async-handler';
 import { query, getClient } from '../config/db.js';
 import { randomBytes, createHash } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
-import { enqueueReadyNotification, processNotificationJobs } from '../services/webPushService.js';
+import { notifyOrderReady, processNotificationJobs } from '../services/webPushService.js';
 
 // ------------------------------------------------------------------
 // Status state machine
@@ -417,20 +417,18 @@ export const transitionOrderStatus = asyncHandler(async (req, res) => {
 
     await client.commit();
 
-    // After commit: enqueue and process Web Push notification outbox job
+    // After commit: send Web Push notification when order reaches READY
     if (status === 'READY') {
-      enqueueReadyNotification({
+      notifyOrderReady({
         orderId,
         business_id,
-        payload: {
-          title: 'Order is Ready!',
-          body: `Order #${order.order_number} is ready for pickup.`,
-          orderId,
-          status: 'READY',
-        },
+        orderNumber: order.order_number,
+        customerName: order.customer_name || 'Customer',
       })
-        .then(() => processNotificationJobs())
-        .catch((err) => console.error('[PUSH_PROCESS_ERROR]', err.message));
+        .then((result) => {
+          console.log('[PUSH_READY]', result);
+        })
+        .catch((err) => console.error('[PUSH_READY_ERROR]', err.message));
     }
 
     // Broadcast to tenant-scoped business room + order-specific room
