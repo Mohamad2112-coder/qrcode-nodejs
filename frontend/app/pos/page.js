@@ -10,7 +10,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { t, direction, formatCurrency } from '@/lib/i18n';
-import { orders as orderApi } from '@/lib/api';
+import { orders as orderApi, getAuthToken, removeToken } from '@/lib/api';
 
 const CATEGORIES = [
   { id: 'all', label: { en: 'All', ar: 'ال全部', kb: 'هەموو' }, color: 'bg-gray-100 text-gray-700' },
@@ -66,6 +66,15 @@ export default function PosPage() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [transitioning, setTransitioning] = useState({});
 
+  // --- Auth check: redirect to login if no valid token ---
+  useEffect(() => {
+    if (!getAuthToken()) {
+      removeToken();
+      router.push('/login');
+      return;
+    }
+  }, [router]);
+
   // --- Load products from API on mount (fallback to static MENU) ---
   useEffect(() => {
     let mounted = true;
@@ -116,6 +125,7 @@ export default function PosPage() {
   };
 
   const isPending = (s) => s === 'PENDING';
+  const isPreparing = (s) => s === 'PREPARING';
   const isReady = (s) => s === 'READY';
 
   // --- Cart computations ---
@@ -220,6 +230,11 @@ export default function PosPage() {
       setOrderNotes('');
       await fetchOrders();
     } catch (err) {
+      if (err.status === 401) {
+        removeToken();
+        router.push('/login');
+        return;
+      }
       setError(err.message || t('error'));
     } finally {
       setSubmitting(false);
@@ -392,6 +407,15 @@ export default function PosPage() {
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
                           {isPending(order.status) && !isTransitioning && (
+                            <button
+                              onClick={() => transitionOrder(order.id, 'PREPARING')}
+                              disabled={isTransitioning}
+                              className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                            >
+                              {t('startPreparing') || 'Mark Preparing'}
+                            </button>
+                          )}
+                          {isPreparing(order.status) && !isTransitioning && (
                             <button
                               onClick={() => transitionOrder(order.id, 'READY')}
                               disabled={isTransitioning}

@@ -29,7 +29,7 @@ export const TRANSITION_ROLES = {
   'PENDING->PREPARING': ['kitchen', 'cashier', 'manager', 'owner'],
   'PENDING->READY': ['cashier', 'manager', 'owner'],
   'PENDING->CANCELLED': ['cashier', 'manager', 'owner'],
-  'PREPARING->READY': ['kitchen', 'manager', 'owner'],
+  'PREPARING->READY': ['kitchen', 'cashier', 'manager', 'owner'],
   'PREPARING->CANCELLED': ['manager', 'owner'],
   'READY->COLLECTED': ['kitchen', 'cashier', 'manager', 'owner'],
   'READY->CANCELLED': ['manager', 'owner'],

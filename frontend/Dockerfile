@@ -7,6 +7,15 @@ WORKDIR /usr/src/app
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# Build-time args for Next.js public runtime config (inlined at build time)
+ARG NEXT_PUBLIC_API_URL=http://localhost:5000
+ARG NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
+ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY=
+
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL}
+ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
+
 # Stage 1: Install dependencies
 FROM base AS deps
 COPY package*.json ./

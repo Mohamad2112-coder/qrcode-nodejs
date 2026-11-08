@@ -49,6 +49,8 @@ export default function TrackPage() {
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [pushPrompt, setPushPrompt] = useState(false);
   const [registering, setRegistering] = useState(false);
+  const [previousStatus, setPreviousStatus] = useState(null);
+  const [statusChanged, setStatusChanged] = useState(false);
 
   const steps = STATUS_STEPS[locale] || STATUS_STEPS.en;
 
@@ -72,8 +74,15 @@ export default function TrackPage() {
       try {
         setLoading(true);
         const { order: o, items: it } = await api.get(`/api/v1/orders/track/${token}`);
-        setOrder(o);
-        setItems(it);
+        if (mounted) {
+          setOrder(o);
+          setItems(it);
+          if (o.status !== previousStatus) {
+            setPreviousStatus(o.status);
+            setStatusChanged(true);
+            setTimeout(() => setStatusChanged(false), 1500);
+          }
+        }
         setError(null);
       } catch (err) {
         setError(err.message || t('error'));
@@ -87,8 +96,15 @@ export default function TrackPage() {
       if (!mounted) return;
       try {
         const { order: o, items: it } = await api.get(`/api/v1/orders/track/${token}`);
-        setOrder(o);
-        setItems(it);
+        if (mounted) {
+          setOrder(o);
+          setItems(it);
+          if (o.status !== previousStatus) {
+            setPreviousStatus(o.status);
+            setStatusChanged(true);
+            setTimeout(() => setStatusChanged(false), 1500);
+          }
+        }
       } catch (_e) {
         // silently retry
       }
@@ -231,8 +247,8 @@ export default function TrackPage() {
               const pending = currentIndex < idx;
               return (
                 <div key={step.key} className="flex-1 flex flex-col items-center relative">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all ${
-                    completed ? 'bg-green-600 text-white' : active ? 'bg-brand-600 text-white ring-2 ring-brand-300' : 'bg-gray-100 text-gray-400'
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all duration-500 ${
+                    completed ? 'bg-green-600 text-white' : active ? 'bg-brand-600 text-white ring-2 ring-brand-300 animate-pulse' : 'bg-gray-100 text-gray-400'
                   }`}>
                     {step.icon}
                   </div>
@@ -251,17 +267,17 @@ export default function TrackPage() {
           <div className="w-full h-1.5 bg-gray-200 rounded-full mt-2 overflow-hidden">
             <div className={`h-full transition-all duration-500 ${
               currentIndex === STATUS_ORDER.length - 1 ? 'bg-green-600' : 'bg-brand-600'
-            }`} style={{ width: `${progress}%` }}></div>
+            } ${statusChanged ? 'animate-pulse' : ''}`} style={{ width: `${progress}%` }}></div>
           </div>
         </div>
 
         {/* Current status card */}
-        <div className={`card ${isComplete ? 'border-green-200 bg-green-50' : ''}`}>
+        <div className={`card ${isComplete ? 'border-green-200 bg-green-50' : ''} ${statusChanged ? 'animate-pulse ring-2 ring-brand-300' : ''}`}>
           <div className="flex items-center gap-3">
             <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${
               order.status === 'READY' ? 'bg-green-100 text-green-600' :
               order.status === 'PREPARING' ? 'bg-blue-100 text-blue-600' :
-              order.status === 'COLLECTED' ? 'bg-green-600 text-white' :
+              order.status === 'COLLECTED' ? 'bg-green-600 text-white animate-checkmark' :
               order.status === 'CANCELLED' ? 'bg-red-100 text-red-600' :
               'bg-amber-100 text-amber-700'
             }`}>
