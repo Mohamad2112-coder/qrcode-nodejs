@@ -125,7 +125,11 @@ export default function TrackPage() {
 
   // --- Web Push subscription ---
   async function registerPush() {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setError('Add this page to your Home Screen first, then tap Notify Me When Ready.');
+      setTimeout(() => setError(null), 5000);
+      return;
+    }
     setRegistering(true);
     try {
       const registration = await navigator.serviceWorker.register('/sw.js');
@@ -134,7 +138,7 @@ export default function TrackPage() {
         applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''),
       });
 
-      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/v1/push/subscribe`, {
+      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://192.168.33.19:5000'}/api/v1/push/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -335,7 +339,7 @@ export default function TrackPage() {
             </div>
             <button
               onClick={registerPush}
-              disabled={registering || !pushSupported}
+              disabled={registering}
               className="mt-6 w-full btn btn-primary py-4 text-lg font-bold disabled:opacity-50"
             >
               {registering ? 'Activating...' : t('notifyReady') || 'Notify Me When Ready'}
