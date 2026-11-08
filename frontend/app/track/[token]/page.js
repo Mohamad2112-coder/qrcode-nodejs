@@ -125,14 +125,15 @@ export default function TrackPage() {
 
   // --- Web Push subscription ---
   async function registerPush() {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      setError('Add this page to your Home Screen first, then tap Notify Me When Ready.');
-      setTimeout(() => setError(null), 5000);
-      return;
-    }
     setRegistering(true);
     try {
+      if (!('serviceWorker' in navigator)) {
+        throw new Error('Service Worker not supported. Please add this page to your Home Screen.');
+      }
       const registration = await navigator.serviceWorker.register('/sw.js');
+      if (!('PushManager' in window)) {
+        throw new Error('Push notifications not supported on this device. Add this page to your Home Screen.');
+      }
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''),
@@ -154,8 +155,8 @@ export default function TrackPage() {
 
       setPushSubscribed(true);
       setPushPrompt(false);
-      // Note: order_id is stored with the subscription so the backend
-      // knows which order's READY notifications to send to this subscriber.
+      setError('Push notifications enabled! You will be notified when your order is ready.');
+      setTimeout(() => setError(null), 5000);
     } catch (err) {
       console.error('[PUSH] registration failed', err);
       setError(err.message || 'Push registration failed');
