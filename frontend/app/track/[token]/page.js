@@ -128,7 +128,7 @@ export default function TrackPage() {
     setRegistering(true);
     try {
       if (!('serviceWorker' in navigator)) {
-        throw new Error('Service Worker not supported. Please add this page to your Home Screen.');
+        throw new Error('Service Worker not supported. Close ALL Safari tabs, reopen this page from your Home Screen, and try again.');
       }
       const registration = await navigator.serviceWorker.register('/sw.js');
       if (!('PushManager' in window)) {
