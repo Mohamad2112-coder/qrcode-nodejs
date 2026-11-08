@@ -37,8 +37,10 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // API calls: try network, fallback to cache (offline indicator handled in UI)
-  if (url.pathname.startsWith('/api/')) {
+  // API calls: only intercept same-origin API routes; let cross-origin
+  // API calls (e.g. to backend on a different port) go directly to the browser
+  // so CORS is handled normally.
+  if (url.pathname.startsWith('/api/') && url.origin === self.location.origin) {
     event.respondWith(
       fetch(request).catch(() => caches.match(request)),
     );

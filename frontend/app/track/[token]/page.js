@@ -45,11 +45,12 @@ export default function TrackPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [pushSupported, setPushSupported] = useState(false);
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [pushPrompt, setPushPrompt] = useState(false);
   const [registering, setRegistering] = useState(false);
-
+  const [previousStatus, setPreviousStatus] = useState(null);
+  const [statusChanged, setStatusChanged] = useState(false);
+  const pushSupported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
   const steps = STATUS_STEPS[locale] || STATUS_STEPS.en;
 
   const trackStatusLabels = {
@@ -72,8 +73,15 @@ export default function TrackPage() {
       try {
         setLoading(true);
         const { order: o, items: it } = await api.get(`/api/v1/orders/track/${token}`);
-        setOrder(o);
-        setItems(it);
+        if (mounted) {
+          setOrder(o);
+          setItems(it);
+          if (o.status !== previousStatus) {
+            setPreviousStatus(o.status);
+            setStatusChanged(true);
+            setTimeout(() => setStatusChanged(false), 1500);
+          }
+        }
         setError(null);
       } catch (err) {
         setError(err.message || t('error'));
@@ -87,17 +95,21 @@ export default function TrackPage() {
       if (!mounted) return;
       try {
         const { order: o, items: it } = await api.get(`/api/v1/orders/track/${token}`);
-        setOrder(o);
-        setItems(it);
+        if (mounted) {
+          setOrder(o);
+          setItems(it);
+          if (o.status !== previousStatus) {
+            setPreviousStatus(o.status);
+            setStatusChanged(true);
+            setTimeout(() => setStatusChanged(false), 1500);
+          }
+        }
       } catch (_e) {
         // silently retry
       }
     }, 5000);
 
-    // Check push support
-    if (typeof window !== 'undefined') {
-      setPushSupported('serviceWorker' in navigator && 'PushManager' in window);
-    }
+    // Check push support is done via direct check above
 
     return () => {
       mounted = false;
@@ -113,16 +125,21 @@ export default function TrackPage() {
 
   // --- Web Push subscription ---
   async function registerPush() {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     setRegistering(true);
     try {
+      if (!('serviceWorker' in navigator)) {
+        throw new Error('Service Worker not supported. Close ALL Safari tabs, reopen this page from your Home Screen, and try again.');
+      }
       const registration = await navigator.serviceWorker.register('/sw.js');
+      if (!('PushManager' in window)) {
+        throw new Error('Push notifications not supported on this device. Add this page to your Home Screen.');
+      }
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''),
       });
 
-      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/v1/push/subscribe`, {
+      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://192.168.33.19:5000'}/api/v1/push/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -138,10 +155,8 @@ export default function TrackPage() {
 
       setPushSubscribed(true);
       setPushPrompt(false);
-      // Notify backend this order wants READY notifications
-      if (order?.id) {
-        await api.post('/api/v1/push/notify/ready', { orderId: order.id });
-      }
+      setError('Push notifications enabled! You will be notified when your order is ready.');
+      setTimeout(() => setError(null), 5000);
     } catch (err) {
       console.error('[PUSH] registration failed', err);
       setError(err.message || 'Push registration failed');
@@ -231,8 +246,8 @@ export default function TrackPage() {
               const pending = currentIndex < idx;
               return (
                 <div key={step.key} className="flex-1 flex flex-col items-center relative">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all ${
-                    completed ? 'bg-green-600 text-white' : active ? 'bg-brand-600 text-white ring-2 ring-brand-300' : 'bg-gray-100 text-gray-400'
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all duration-500 ${
+                    completed ? 'bg-green-600 text-white' : active ? 'bg-brand-600 text-white ring-2 ring-brand-300 animate-pulse' : 'bg-gray-100 text-gray-400'
                   }`}>
                     {step.icon}
                   </div>
@@ -251,17 +266,17 @@ export default function TrackPage() {
           <div className="w-full h-1.5 bg-gray-200 rounded-full mt-2 overflow-hidden">
             <div className={`h-full transition-all duration-500 ${
               currentIndex === STATUS_ORDER.length - 1 ? 'bg-green-600' : 'bg-brand-600'
-            }`} style={{ width: `${progress}%` }}></div>
+            } ${statusChanged ? 'animate-pulse' : ''}`} style={{ width: `${progress}%` }}></div>
           </div>
         </div>
 
         {/* Current status card */}
-        <div className={`card ${isComplete ? 'border-green-200 bg-green-50' : ''}`}>
+        <div className={`card ${isComplete ? 'border-green-200 bg-green-50' : ''} ${statusChanged ? 'animate-pulse ring-2 ring-brand-300' : ''}`}>
           <div className="flex items-center gap-3">
             <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${
               order.status === 'READY' ? 'bg-green-100 text-green-600' :
               order.status === 'PREPARING' ? 'bg-blue-100 text-blue-600' :
-              order.status === 'COLLECTED' ? 'bg-green-600 text-white' :
+              order.status === 'COLLECTED' ? 'bg-green-600 text-white animate-checkmark' :
               order.status === 'CANCELLED' ? 'bg-red-100 text-red-600' :
               'bg-amber-100 text-amber-700'
             }`}>
@@ -307,21 +322,26 @@ export default function TrackPage() {
         </div>
 
         {/* Web Push opt-in banner */}
-        {pushSupported && !pushSubscribed && !isComplete && (
-          <div className="card border-2 border-brand-200 bg-brand-50 p-4 rounded-xl">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-white text-xs">📢</div>
+        {!pushSubscribed && !isComplete && (
+          <div className="card border-4 border-brand-600 bg-brand-50 p-6 rounded-2xl shadow-lg animate-pulse">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-brand-600 flex items-center justify-center text-white text-2xl">📢</div>
               <div>
-                <p className="font-semibold text-gray-900">{t('enableNotifications')}</p>
-                <p className="text-sm text-gray-600 mt-0.5">
+                <p className="text-lg font-bold text-gray-900">{t('enableNotifications')}</p>
+                <p className="text-base text-gray-700 mt-1">
                   {t('notifyReady') || 'Get notified when your order is ready.'}
                 </p>
+                {pushSupported === false && (
+                  <p className="text-sm text-gray-600 mt-2">
+                    {t('pushNotSupported') || 'Add this page to your Home Screen first, then tap Notify Me.'}
+                  </p>
+                )}
               </div>
             </div>
             <button
               onClick={registerPush}
               disabled={registering}
-              className="mt-4 w-full btn btn-primary py-2.5 text-sm disabled:opacity-50"
+              className="mt-6 w-full btn btn-primary py-4 text-lg font-bold disabled:opacity-50"
             >
               {registering ? 'Activating...' : t('notifyReady') || 'Notify Me When Ready'}
             </button>

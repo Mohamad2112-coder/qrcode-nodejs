@@ -47,4 +47,36 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  @keyframes pulse-ring {
+    0% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+    }
+    70% {
+      transform: scale(1);
+      box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+    }
+    100% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+    }
+  }
+
+  .animate-status-change {
+    animation: pulse-ring 1.5s ease-in-out infinite;
+  }
+
+  @keyframes checkmark-bounce {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.2);
+    }
+  }
+
+  .animate-checkmark {
+    animation: checkmark-bounce 0.6s ease-in-out;
+  }
 }
